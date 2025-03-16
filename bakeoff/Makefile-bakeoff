@@ -1,0 +1,55 @@
+#
+# makefile for packet passaround bakeoff
+#
+# list-update: 
+#	16 mar 2025 -bjr;
+#
+
+PORT= 3333
+
+RED= \033[0;31m
+GREEN= \033[0;32m
+NC= \033[0m
+
+all:
+	@echo "*** Targets: build, clean, test-local, run"
+
+build:
+	make passaround
+
+passaround: passaround.c passaround.h foo-socket.o foo-socket.h
+	cc -o $@ $< foo-socket.o
+	
+foo-socket.o: foo-socket.c foo-socket.h
+	cc -c -o $@ $<
+
+test-local: passaround test-local-ref
+	./passaround -n 3 -m localhost:localhost:localhost ${PORT} > test-local.out
+	diff test-local.ref test-local.out
+	cat test-local.out
+	@echo "${GREEN}*** Passed! ***${NC}"
+
+test-local-ref:
+	@echo "S: 127.0.0.1:${PORT} |localhost:localhost|" > test-local.ref
+	@echo "R: 127.0.0.1:${PORT} |localhost:localhost|" >> test-local.ref
+	@echo "S: 127.0.0.1:${PORT} |localhost|" >> test-local.ref
+	@echo "R: 127.0.0.1:${PORT} |localhost|" >> test-local.ref
+	@echo "S: 127.0.0.1:${PORT} ||" >> test-local.ref
+
+W= /var/www/ubuntu/netbounce-log.txt
+
+run: passaround
+	cat /dev/null > $W
+	@echo -n "ready to for the bake-off at time " >> $W
+	date >> $W
+	./passaround -v -n 0 ${PORT} >> $W
+
+
+tcpdump:
+	sudo tcpdump -i eth0 -X udp port ${PORT}
+
+clean:
+	-rm passaround foo-socket.o
+	-rm test-local.out test-local.ref 
+	-rm test-s.out test-c.out test-c.ref test-s.ref
+
